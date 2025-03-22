@@ -13,15 +13,23 @@ function sleep(ms) {
 
 runButton.addEventListener('click', async () => {
     let count = 0;
+    let pathCount = 0;
     while (queue.length > 0) {
-        console.log(queue.length, count, validPaths.length);
+        console.log(queue.length, count);
         processQueue();
         count ++;
         if (count > 2000) {
             break;
         }
 
-        if (validPaths.length > 1000) {
+        if (validPath && !foundNewPath) {
+            pathCount ++;
+        } else if (foundNewPath) {
+            pathCount = 0;
+            foundNewPath = false;
+        }
+
+        if (pathCount > 200) {
             break;
         }
 
@@ -29,10 +37,9 @@ runButton.addEventListener('click', async () => {
 
         draw();
 
-        await sleep(10);
+        await sleep(5);
     }
 
-    sortValidPaths();
     renderPathList();
 
     draw();
@@ -54,32 +61,49 @@ const walls = [
 ];
 let points = [];
 let path = [];
-const validPaths = [];
+let validPath = null;
 let selectedPath = null;
 const processed = [];
 const preComputedPoints = [];
 let endPoints = [];
+let foundNewPath = false;
+
+function addValidPath(path) {
+    const cost = getPathCost(path);
+    if (!validPath || cost < getPathCost(validPath)) {
+        validPath = path;
+        foundNewPath = true;
+    } else {
+        //console.log("Rejecting path", path, "cost too much");
+    }
+}
 
 function keyPoint(point) {
     return `${point[0]},${point[1]}`;
 }
 
 function preCompute() {
-    endPoints = getPointsFromPosition(end).map((point) => keyPoint(point)).reduce((obj, key) => {
-        return {
+    endPoints = getPointsFromPosition(end).reduce((obj, point) => {
+        const secondaryPoints = getPointsFromPosition(point);
+        const key = keyPoint(point);
+        const newObj = {
             ...obj,
-            [key]: true,
+            [key]: [
+                point,
+                end,
+            ],
         };
+
+        /*for (const point2 of secondaryPoints) {
+            const secondaryKey = keyPoint(point2);
+            if (newObj[secondaryKey] && getPathCost(newObj[secondaryKey]) < getPathCost([point2, point, end])) {
+                continue;
+            }
+            newObj[secondaryKey] = [point2, point, end];
+        }*/
+
+        return newObj;
     }, {});
-}
-
-function sortValidPaths() {
-    validPaths.sort((a, b) => {
-        const costA = getPathCost(a);
-        const costB = getPathCost(b);
-
-        return costA - costB;
-    });
 }
 
 function doLinesIntersect(l1p1, l1p2, l2p1, l2p2) {
@@ -439,7 +463,7 @@ function processQueue() {
         // is this point a point that can see the end?
         const key = keyPoint(point);
         if (endPoints[key]) {
-            validPaths.push([...path, position, point, end]);
+            addValidPath([...path, position, ...endPoints[key]]);
             continue;
         }
 
@@ -467,23 +491,13 @@ function renderPathList() {
     pathList.innerHTML = "";
 
     let count = 0;
-    for (const path of validPaths) {
-        const cost = getPathCost(path);
-        const text = `Path of cost ${cost} - ${path.length} steps`;
+    if (validPath) {
+        const cost = getPathCost(validPath);
+        const text = `Path of cost ${cost} - ${validPath.length} steps`;
         const holder = document.createElement("div");
         holder.textContent = text;
 
-        holder.addEventListener("click", () => {
-            selectedPath = path;
-            draw();
-        });
-
         pathList.appendChild(holder);
-
-        if (count > 30) {
-            break;
-        }
-        count ++;
     }
 }
 
@@ -491,8 +505,6 @@ function update() {
     processQueue();
 
     renderPathList();
-
-    selectedPath = null;
 
     draw();
 }
@@ -565,9 +577,9 @@ function draw() {
         }
     }
 
-    if (selectedPath) {
+    if (validPath) {
         let last = null;
-        for (const point of selectedPath) {
+        for (const point of validPath) {
             if (last) {
                 ctx.strokeStyle = "#0f0";
                 ctx.beginPath();
