@@ -7,20 +7,37 @@ button.addEventListener('click', () => {
     update();
 });
 
-runButton.addEventListener('click', () => {
+function sleep(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+runButton.addEventListener('click', async () => {
     let count = 0;
     while (queue.length > 0) {
         console.log(queue.length, count, validPaths.length);
         processQueue();
         count ++;
-        if (count > 1000) {
+        if (count > 2000) {
             break;
         }
+
+        if (validPaths.length > 1000) {
+            break;
+        }
+
+        renderPathList();
+
+        draw();
+
+        await sleep(10);
     }
 
+    sortValidPaths();
     renderPathList();
 
     draw();
+
+    console.log(queue);
 });
 
 
@@ -40,6 +57,30 @@ let path = [];
 const validPaths = [];
 let selectedPath = null;
 const processed = [];
+const preComputedPoints = [];
+let endPoints = [];
+
+function keyPoint(point) {
+    return `${point[0]},${point[1]}`;
+}
+
+function preCompute() {
+    endPoints = getPointsFromPosition(end).map((point) => keyPoint(point)).reduce((obj, key) => {
+        return {
+            ...obj,
+            [key]: true,
+        };
+    }, {});
+}
+
+function sortValidPaths() {
+    validPaths.sort((a, b) => {
+        const costA = getPathCost(a);
+        const costB = getPathCost(b);
+
+        return costA - costB;
+    });
+}
 
 function doLinesIntersect(l1p1, l1p2, l2p1, l2p2) {
     let slope1;
@@ -165,10 +206,13 @@ function getAllPoints() {
 
     points.push([...end]);
 
-    for (const wall of walls) {
+    for (let i=0;i<walls.length;i++) {
+        const wall = walls[i];
 
         const cx = (Math.abs(wall[0] - wall[2]) / 2) + Math.min(wall[0], wall[2]);
         const cy = (Math.abs(wall[1] - wall[3]) / 2) + Math.min(wall[1], wall[3]);
+
+        const key = `wall_${i}`;
 
         const addablePoints = [
             [wall[0], wall[1]],
@@ -189,17 +233,20 @@ function getAllPoints() {
             points.push([
                 point[0] + ux * 1,
                 point[1] + uy * 1,
+                key,
             ]);
 
-            points.push([
+            /*points.push([
                 point[0] + ux * 1,
                 point[1],
+                key,
             ]);
 
             points.push([
                 point[0],
                 point[1] + uy * 1,
-            ]);
+                key,
+            ]);*/
         }
 
         lines.push([wall[0], wall[1], wall[2], wall[1]]);
@@ -209,14 +256,14 @@ function getAllPoints() {
     }
 
     // add points involving the outer edge of the map
-    for (let i=0;i<=width;i+=Math.floor(width / 2)) {
-        points.push([i, 0]);
-        points.push([i, height]);
+    for (let i=0;i<=width;i+=Math.floor(width / 4)) {
+        points.push([i, 0, 'outer']);
+        points.push([i, height, 'outer']);
     }
 
-    for (let i=0;i<=height;i+=Math.floor(height / 2)) {
-        points.push([0, i]);
-        points.push([width, i]);
+    for (let i=0;i<=height;i+=Math.floor(height / 4)) {
+        points.push([0, i, 'outer']);
+        points.push([width, i, 'outer']);
     }
 
     // now calculate halfway points between everything
@@ -225,6 +272,11 @@ function getAllPoints() {
     for (let i = 0;i<length;i++) {
         for (let j=i+1;j<length;j++) {
             if (j === i) {
+                continue;
+            }
+
+            if (points[i][2] === points[j][2]) {
+                // if points are from the same source, quit
                 continue;
             }
 
@@ -241,11 +293,16 @@ function getAllPoints() {
     // remove dupes
     const seen = new Set();
     points = points.filter((point) => {
+        if (point[0] < 0 || point[1] < 0 || point[0] > width || point[1] > height) {
+            return false;
+        }
+
         const key = `${point[0]},${point[1]}`;
         if (seen.has(key)) {
             return false;
         }
         seen.add(key);
+
         return true;
     });
 
@@ -259,37 +316,19 @@ function getAllPoints() {
     return allPoints;
 }
 
-function getPointsFromPosition(position, path) {
+function getPointsFromPosition(position) {
+    const key = `${position[0]},${position[1]}`;
+    if (preComputedPoints[key]) {
+        return preComputedPoints[key];
+    }
     //console.log('begin get points', position);
     let { points, lines } = getAllPoints();
 
     // filter out points we can't see
     points = points.filter((point) => {
-        if (point[0] < 0 || point[1] < 0 || point[0] > width || point[1] > height) {
-            return false;
-        }
-
-        if (point[0] !== 59.5) {
-            //return false;
-        }
-
         if (point[0] === position[0] && point[1] === position[1]) {
             // if this point is our current position ignore it
             return false;
-        }
-        for (const item of processed) {
-            //console.log(point, item);
-            if (item[0] === point[0] && item[1] === point[1]) {
-                //console.log('matcing');
-                //return false;
-            }
-        }
-        for (const item of path) {
-            //console.log(point, item);
-            if (item[0] === point[0] && item[1] === point[1]) {
-                //console.log('matcing');
-                return false;
-            }
         }
         for (const line of lines) {
             const intersect = doLinesIntersect(
@@ -305,6 +344,8 @@ function getPointsFromPosition(position, path) {
     }).map((point) => [...point]);
 
     //console.log('after filter', points.length);
+
+    preComputedPoints[key] = points;
 
     return points;
 }
@@ -322,23 +363,35 @@ function addToQueue(position, path) {
         }
     }
 
-    const pointsForPosition = getPointsFromPosition(position, path);
+    //console.log(path);
+
     //const cost = getPathCost([...path, position]);
     // distance to the end
     const cost = Math.sqrt(Math.pow(position[0] - end[0], 2) + Math.pow(position[1] - end[1], 2));
+    let pathCost = 0;
+    let previous = null;
+    for (const point of path) {
+        if (previous) {
+            pathCost += Math.sqrt(Math.pow(point[0] - previous[0], 2) + Math.pow(point[1] - previous[1], 2));
+        }
+        previous = point;
+    }
+    if (previous) {
+        pathCost += Math.sqrt(Math.pow(previous[0] - position[0], 2) + Math.pow(previous[1] - position[1], 2));
+    }
 
     const newQueueObj = {
         position,
-        points: pointsForPosition,
         path,
         cost,
+        pathCost,
     };
 
     //console.log('hanlding', position);
 
     let inserted = false;
     for (let i=0;i<queue.length;i++) {
-        if (queue[i].cost > cost) {
+        if (queue[i].path.length >= path.length && queue[i].cost > cost) {
             queue.splice(i, 0, newQueueObj);
             inserted = true;
             break;
@@ -356,30 +409,44 @@ function processQueue() {
         return;
     }
 
-    const item = queue.shift();
-    position = item.position;
-    points = item.points;
-    path = item.path;
+    const queueItem = queue.shift();
 
-    //console.log('shifted', item.position, item, queue.length, queue, processed);
+    let pointsForPosition = getPointsFromPosition(queueItem.position);
+        pointsForPosition = pointsForPosition.filter((point) => {
+        for (const item of processed) {
+            //console.log(point, item);
+            if (item[0] === point[0] && item[1] === point[1]) {
+                //console.log('matcing');
+                //return false;
+            }
+        }
+        for (const item of queueItem.path) {
+            if (item[0] === point[0] && item[1] === point[1]) {
+                //console.log('matcing');
+                return false;
+            }
+        }
 
-    if (position[0] === end[0] && position[1] === end[1]) {
-        // we found a valid path, no sense continuing down this section of the tree
-        validPaths.push([...path, position]);
-        validPaths.sort((a, b) => {
-            const costA = getPathCost(a);
-            const costB = getPathCost(b);
+        return true;
+    });
 
-            return costA - costB;
-        });
-        return;
-    }
+    position = queueItem.position;
+    points = pointsForPosition;
+    path = queueItem.path;
+
    // console.log('procesing queue got points', points.length);
     for (const point of points) {
+        // is this point a point that can see the end?
+        const key = keyPoint(point);
+        if (endPoints[key]) {
+            validPaths.push([...path, position, point, end]);
+            continue;
+        }
+
         //console.log('checking', point);
         addToQueue(point, [...path, position]);
     }
-    console.log('when done', queue.length, processed.length);
+    //console.log('when done', queue.length, processed.length);
 }
 
 function getPathCost(path) {
@@ -399,6 +466,7 @@ function getPathCost(path) {
 function renderPathList() {
     pathList.innerHTML = "";
 
+    let count = 0;
     for (const path of validPaths) {
         const cost = getPathCost(path);
         const text = `Path of cost ${cost} - ${path.length} steps`;
@@ -411,6 +479,11 @@ function renderPathList() {
         });
 
         pathList.appendChild(holder);
+
+        if (count > 30) {
+            break;
+        }
+        count ++;
     }
 }
 
@@ -450,7 +523,7 @@ function draw() {
         ctx.fillRect(wall[0], wall[1], Math.abs(wall[0]-wall[2]), Math.abs(wall[1]-wall[3]));
     }
 
-    for (const point of points) {
+    /*for (const point of points) {
         ctx.fillStyle = "black";
         ctx.beginPath();
         ctx.arc(point[0], point[1], 5, 0, 2*Math.PI);
@@ -461,7 +534,7 @@ function draw() {
         ctx.moveTo(position[0], position[1]);
         ctx.lineTo(point[0], point[1]);
         ctx.stroke();
-    }
+    }*/
 
     for (const point of getAllPoints().points) {
         ctx.fillStyle = "purple";
@@ -513,4 +586,5 @@ function draw() {
 }
 
 addToQueue(start, [], []);
+preCompute();
 update();
