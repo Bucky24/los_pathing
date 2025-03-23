@@ -17,24 +17,13 @@ function sleep(ms) {
 }
 
 runButton.addEventListener('click', async () => {
+    start();
     let count = 0;
-    let pathCount = 0;
     while (queue.length > 0) {
         console.log(queue.length, count);
         processQueue();
         count ++;
         if (count > 2000) {
-            break;
-        }
-
-        if (validPath && !foundNewPath) {
-            pathCount ++;
-        } else if (foundNewPath) {
-            pathCount = 0;
-            foundNewPath = false;
-        }
-
-        if (pathCount > 200) {
             break;
         }
 
@@ -56,9 +45,9 @@ runButton.addEventListener('click', async () => {
 const width = 500;
 const height = 500;
 
-const start = [40, 200];
-let position = [...start];
-const queue = [];
+const startPoint = [40, 200];
+let position = [];
+let queue = [];
 const end = [400, 50];
 const walls = [
     [60, 0, 80, 300],
@@ -69,10 +58,9 @@ let points = [];
 let path = [];
 let validPath = null;
 let selectedPath = null;
-const processed = {};
-const preComputedPoints = [];
+let processed = {};
+let preComputedPoints = [];
 let endPoints = [];
-let foundNewPath = false;
 
 const overridePoints = null;
 /*const overridePoints = [
@@ -87,7 +75,6 @@ function addValidPath(path) {
     const cost = getPathCost(path);
     if (!validPath || cost < getPathCost(validPath)) {
         validPath = path;
-        foundNewPath = true;
     } else {
         //console.log("Rejecting path", path, "cost too much");
     }
@@ -105,7 +92,6 @@ function preCompute() {
         return;
     }
     endPoints = getPointsFromPosition(end).reduce((obj, point) => {
-        const secondaryPoints = getPointsFromPosition(point);
         const key = keyPoint(point);
         const newObj = {
             ...obj,
@@ -114,14 +100,6 @@ function preCompute() {
                 end,
             ],
         };
-
-        /*for (const point2 of secondaryPoints) {
-            const secondaryKey = keyPoint(point2);
-            if (newObj[secondaryKey] && getPathCost(newObj[secondaryKey]) < getPathCost([point2, point, end])) {
-                continue;
-            }
-            newObj[secondaryKey] = [point2, point, end];
-        }*/
 
         return newObj;
     }, {});
@@ -236,10 +214,6 @@ function doLinesIntersect(l1p1, l1p2, l2p1, l2p2) {
 
     return onL1 && onL12;
 }
-
-setInterval(() => {
-    //update();
-}, 100);
 
 let allPoints = null;
 function getAllPoints() {
@@ -630,6 +604,21 @@ function draw() {
     ctx.restore();
 }
 
-addToQueue(start, [], []);
-preCompute();
-update();
+function start() {
+    position = [...startPoint];
+    queue = [];
+    processed = {};
+    validPath = null;
+    points = [];
+    path = [];
+    selectedPath = null;
+    preComputedPoints = [];
+    endPoints = [];
+    allPoints = null;
+
+    addToQueue(startPoint, [], []);
+    preCompute();
+    update();
+}
+
+start();
