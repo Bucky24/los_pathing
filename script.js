@@ -3,6 +3,11 @@ const button = document.getElementById("step");
 const pathList = document.getElementById("path_list");
 const runButton = document.getElementById("run");
 
+canvas.addEventListener("click", (e) => {
+    const rect = e.target.getBoundingClientRect();
+    console.log(`[${e.clientX - rect.left}, ${e.clientY - rect.top}]`);
+});
+
 button.addEventListener('click', () => {
     update();
 });
@@ -58,15 +63,25 @@ const end = [400, 50];
 const walls = [
     [60, 0, 80, 300],
     [200,200, 300, 220],
+    [89, 274, 176, 331],
 ];
 let points = [];
 let path = [];
 let validPath = null;
 let selectedPath = null;
-const processed = [];
+const processed = {};
 const preComputedPoints = [];
 let endPoints = [];
 let foundNewPath = false;
+
+const overridePoints = null;
+/*const overridePoints = [
+    [18, 264],
+    [180, 350],
+    [53, 425],
+    [126, 130],
+    [...end],
+];*/
 
 function addValidPath(path) {
     const cost = getPathCost(path);
@@ -83,6 +98,12 @@ function keyPoint(point) {
 }
 
 function preCompute() {
+    if (overridePoints) {
+        endPoints = {
+            [keyPoint(end)]: [end],
+        };
+        return;
+    }
     endPoints = getPointsFromPosition(end).reduce((obj, point) => {
         const secondaryPoints = getPointsFromPosition(point);
         const key = keyPoint(point);
@@ -225,6 +246,7 @@ function getAllPoints() {
     if (allPoints) {
         return allPoints;
     }
+
     let points = [];
     const lines = [];
 
@@ -330,10 +352,10 @@ function getAllPoints() {
         return true;
     });
 
-    console.error('loop done', points.length);
+    //console.error('loop done', points.length);
 
     allPoints = {
-        points,
+        points: overridePoints || points,
         lines,
     };
 
@@ -375,22 +397,15 @@ function getPointsFromPosition(position) {
 }
 
 function addToQueue(position, path) {
-    // if we're already handling this point, don't bother to do it again
-    for (const item of processed) {
-        if (item[0] === position[0] && item[1] === position[1]) {
-            //return;
-        }
-    }
+    // don't allow loops in the path
     for (const item of path) {
         if (item[0] === position[0] && item[1] === position[1]) {
             return;
         }
     }
 
-    //console.log(path);
+    const key = keyPoint(position);
 
-    //const cost = getPathCost([...path, position]);
-    // distance to the end
     const cost = Math.sqrt(Math.pow(position[0] - end[0], 2) + Math.pow(position[1] - end[1], 2));
     let pathCost = 0;
     let previous = null;
@@ -411,11 +426,36 @@ function addToQueue(position, path) {
         pathCost,
     };
 
+    // is this item already in the queue? If so, only add it again if our current path
+    // is shorter than the one already in queue
+    if (processed[key] !== undefined && processed[key] !== null) {
+        // find our path in the queue
+        const index = queue.findIndex((a) => {
+            return a.position[0] === position[0] && a.position[1] === position[1];
+        });
+        // if the item has already been processed, then it was probably cheaper
+        // than our path and we can just skip. Otherwise, we can compare
+        if (index >= 0) {
+            const cost = getPathCost(path);
+            const otherCost = getPathCost(queue[index].path);
+
+            if (cost < otherCost) {
+                queue[index] = newQueueObj;
+            }
+        }
+        return;
+    }
+
+    //console.log(path);
+
+    //const cost = getPathCost([...path, position]);
+    // distance to the end
+
     //console.log('hanlding', position);
 
     let inserted = false;
     for (let i=0;i<queue.length;i++) {
-        if (queue[i].path.length >= path.length && queue[i].cost > cost) {
+        if (queue[i].pathCost >= pathCost) {
             queue.splice(i, 0, newQueueObj);
             inserted = true;
             break;
@@ -425,7 +465,7 @@ function addToQueue(position, path) {
     if (!inserted) {
         queue.push(newQueueObj);
     }
-    processed.push([...position]);
+    processed[keyPoint(position)] = true;
 }
 
 function processQueue() {
@@ -437,13 +477,6 @@ function processQueue() {
 
     let pointsForPosition = getPointsFromPosition(queueItem.position);
         pointsForPosition = pointsForPosition.filter((point) => {
-        for (const item of processed) {
-            //console.log(point, item);
-            if (item[0] === point[0] && item[1] === point[1]) {
-                //console.log('matcing');
-                //return false;
-            }
-        }
         for (const item of queueItem.path) {
             if (item[0] === point[0] && item[1] === point[1]) {
                 //console.log('matcing');
@@ -531,7 +564,7 @@ function draw() {
     ctx.fill();
 
     for (const wall of walls) {
-        ctx.fillStyle = "purple";
+        ctx.fillStyle = "rgba(128, 0, 128, 0.5)";
         ctx.fillRect(wall[0], wall[1], Math.abs(wall[0]-wall[2]), Math.abs(wall[1]-wall[3]));
     }
 
