@@ -61,6 +61,7 @@ let selectedPath = null;
 let processed = {};
 let preComputedPoints = [];
 let endPoints = [];
+const maxDistToLine = 5;
 
 const overridePoints = null;
 /*const overridePoints = [
@@ -105,22 +106,89 @@ function preCompute() {
     }, {});
 }
 
-function doLinesIntersect(l1p1, l1p2, l2p1, l2p2) {
-    let slope1;
+function distanceFromLine(l1p1, l1p2, p) {
+    // vertical line
     if (l1p1[0] === l1p2[0]) {
-        slope1 = 1;
-    } else {
-        slope1 = (l1p1[1] - l1p2[1]) / (l1p1[0] - l1p2[0]);
+        // distance is the difference in x
+        return Math.abs(l1p1[0] - p[0]);
     }
+
+    const slope1 = (l1p1[1] - l1p2[1]) / (l1p1[0] - l1p2[0]);
     // y = mx+b, b = y - mx
     const intercept1 = l1p1[1] - slope1 * l1p1[0];
 
-    let slope2;
-    if (l2p1[0] === l2p2[0]) {
-        slope2 = 1;
-    } else {
-        slope2 = (l2p1[1] - l2p2[1]) / (l2p1[0] - l2p2[0]);
+    // horizontal line
+    if (slope1 === 0) {
+        // similar to above, just from the y
+        return Math.abs(l1p1[1] - p[1]);
     }
+
+    // https://en.wikipedia.org/wiki/Distance_from_a_point_to_a_line
+    const dist = Math.abs((l1p2[1] - l1p1[1]) * p[0] - (l1p2[0] - l1p1[0]) * p[1] + l1p2[0] * l1p1[1] - l1p2[1] * l1p1[0]) / Math.sqrt(Math.pow(l1p2[1] - l1p1[1], 2) + Math.pow(l1p2[0] - l1p1[0], 2));
+
+    return dist;
+}
+
+function doLinesIntersect(l1p1, l1p2, l2p1, l2p2) {
+    const l1MaxY = Math.max(l1p1[1], l1p2[1]);
+    const l1MinY = Math.min(l1p1[1], l1p2[1]); 
+    const l1MaxX = Math.max(l1p1[0], l1p2[0]);
+    const l1MinX = Math.min(l1p1[0], l1p2[0]); 
+    const l2MaxY = Math.max(l2p1[1], l2p2[1]);
+    const l2MinY = Math.min(l2p1[1], l2p2[1]);
+    const l2MaxX = Math.max(l2p1[0], l2p2[0]);
+    const l2MinX = Math.min(l2p1[0], l2p2[0]);
+
+    // vertical line
+    if (l1p1[0] === l1p2[0]) {
+        // to intersect, the x coords of our l2 must be on opposite sides
+        if (
+            (l2p1[0] <= l1p1[0] && l2p2[0] >= l1p1[0]) ||
+            (l2p2[0] <= l1p1[0] && l2p1[0] >= l1p1[0]) 
+        ) {
+            // once that's true it only intersects if either of the l2
+            // y coords is between the l1 y coords OR one coord is above
+            // and one is below. So basically if y coords of l2 are above
+            // or below l1 y coords, then it does not intersect, and this
+            // is less code to check
+
+            if (
+                (l2p1[1] > l1MaxY && l2p2[1] > l1MaxY) ||
+                (l2p1[1] < l1MinY && l2p2[1] < l1MaxY)
+            ) {
+                return false;
+            }
+
+            // in this case the x coords indicate intersection and the y
+            // coords indicate that it does as well
+            return true;
+        }
+
+        return false;
+    }
+    if (l2p1[0] === l2p2[0]) {
+        // basically same thing as above with flipped lines
+        if (
+            (l1p1[0] <= l2p1[0] && l1p2[0] >= l2p1[0]) ||
+            (l1p2[0] <= l2p1[0] && l1p1[0] >= l2p1[0]) 
+        ) {
+            if (
+                (l1p1[1] > l2MaxY && l1p2[1] > l2MaxY) ||
+                (l1p1[1] < l2MinY && l1p2[1] < l2MaxY)
+            ) {
+                return false;
+            }
+            return true;
+        }
+
+        return false;
+    }
+
+    const slope1 = (l1p1[1] - l1p2[1]) / (l1p1[0] - l1p2[0]);
+    // y = mx+b, b = y - mx
+    const intercept1 = l1p1[1] - slope1 * l1p1[0];
+
+    const slope2 = (l2p1[1] - l2p2[1]) / (l2p1[0] - l2p2[0]);
     // y = mx+b, b = y - mx
     const intercept2 = l2p1[1] - slope2 * l2p1[0];
 
@@ -147,27 +215,27 @@ function doLinesIntersect(l1p1, l1p2, l2p1, l2p2) {
         }
     }
 
-    // if one slope is 1 and the other is not, it means that one of our
-    // lines is completely vertical so we can just find the corresponding
-    // y on the non vert line for the vert line's x. If that y is within
+    // if one slope is 0 and the other is not, it means that one of our
+    // lines is completely horizontal so we can just find the corresponding
+    // x on the non horiz line for the horiz line's y. If that x is within
     // both line segments then it's a hit
-    if (slope1 === 1) {
-        const otherY = slope2 * l1p1[0] + intercept2;
+    if (slope1 === 0) {
+        const otherX = (l1p1[1] - intercept2) / slope2;
         //console.log(otherY);
         return (
-            otherY <= Math.max(l1p1[1], l1p2[1]) &&
-            otherY >= Math.min(l1p1[1], l1p2[1]) &&
-            otherY <= Math.max(l2p1[1], l2p2[1]) &&
-            otherY >= Math.min(l2p1[1], l2p2[1])
+            otherX <= l1MaxX &&
+            otherX >= l1MinX &&
+            otherX <= l2MaxX &&
+            otherX >= l2MinX
         );
-    } else if (slope2 === 1) {
-        const otherY = slope1 * l2p1[0] + intercept1;
+    } else if (slope2 === 0) {
+        const otherX = (l2p1[1] - intercept1) / slope1;
         //console.log(otherY);
         return (
-            otherY <= Math.max(l1p1[1], l1p2[1]) &&
-            otherY >= Math.min(l1p1[1], l1p2[1]) &&
-            otherY <= Math.max(l2p1[1], l2p2[1]) &&
-            otherY >= Math.min(l2p1[1], l2p2[1])
+            otherX <= l1MaxX &&
+            otherX >= l1MinX &&
+            otherX <= l2MaxX &&
+            otherX >= l2MinX
         );
     }
 
@@ -324,12 +392,41 @@ function getAllPoints() {
         seen.add(key);
 
         return true;
-    });
+    })
 
+    // filter points that are close together
+    let filteredPoints = [];
+    for (const point of points) {
+        let skip = false;
+        for (const filtered of filteredPoints) {
+            const dist = Math.sqrt(Math.pow(point[0] - filtered[0], 2) + Math.pow(point[1] - filtered[1], 2));
+
+            if (dist < 20) {
+                skip = true;
+                break;
+            }
+        }
+
+        if (!skip) {
+            filteredPoints.push(point);
+        }
+    }
+
+    // filter out points that are too close to lines
+    filteredPoints = filteredPoints.filter((point) => {
+        for (const line of lines) {
+            const dist = distanceFromLine([line[0], line[1]], [line[2], line[3]], point);
+            if (dist < maxDistToLine) {
+                return false;
+            }
+        }
+
+        return true;
+    })
     //console.error('loop done', points.length);
 
     allPoints = {
-        points: overridePoints || points,
+        points: overridePoints || filteredPoints,
         lines,
     };
 
