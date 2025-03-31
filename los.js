@@ -203,7 +203,7 @@ class Los {
         // filter out points that are too close to lines
         filteredPoints = filteredPoints.filter((point) => {
             for (const line of lines) {
-                const dist = distanceFromLine([line[0], line[1]], [line[2], line[3]], point);
+                const dist = distanceFromLine([ {x: line[0], y: line[1]}, {x: line[2], y: line[3]}], {x: point[0], y: point[1] });
                 if (dist < maxDistToLine) {
                     return false;
                 }

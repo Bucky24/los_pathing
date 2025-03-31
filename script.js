@@ -82,25 +82,25 @@ function addValidPath(path) {
     }
 }
 
-function distanceFromLine(l1p1, l1p2, p) {
+function distanceFromLine(line, p) {
     // vertical line
-    if (l1p1[0] === l1p2[0]) {
+    if (line[0].x === line[1].x) {
         // distance is the difference in x
-        return Math.abs(l1p1[0] - p[0]);
+        return Math.abs(line[0].x - p.x);
     }
 
-    const slope1 = (l1p1[1] - l1p2[1]) / (l1p1[0] - l1p2[0]);
+    const slope1 = (line[0].y - line[1].y) / (line[0].x - line[1].x);
     // y = mx+b, b = y - mx
-    const intercept1 = l1p1[1] - slope1 * l1p1[0];
+    const intercept1 = line[0].y - slope1 * line[0].x;
 
     // horizontal line
     if (slope1 === 0) {
         // similar to above, just from the y
-        return Math.abs(l1p1[1] - p[1]);
+        return Math.abs(line[0].y - p.y);
     }
 
     // https://en.wikipedia.org/wiki/Distance_from_a_point_to_a_line
-    const dist = Math.abs((l1p2[1] - l1p1[1]) * p[0] - (l1p2[0] - l1p1[0]) * p[1] + l1p2[0] * l1p1[1] - l1p2[1] * l1p1[0]) / Math.sqrt(Math.pow(l1p2[1] - l1p1[1], 2) + Math.pow(l1p2[0] - l1p1[0], 2));
+    const dist = Math.abs((line[1].y - line[0].y) * p.x - (line[1].x - line[0].x) * p.y + line[1].x * line[0].y - line[1].y * line[0].x) / Math.sqrt(Math.pow(line[1].y - line[0].y, 2) + Math.pow(line[1].x - line[0].x, 2));
 
     return dist;
 }
