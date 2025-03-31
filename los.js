@@ -15,7 +15,7 @@ class Los {
         return `${point[0]},${point[1]}`;
     }
 
-    precompute() {
+    preCompute() {
         if (this.overridePoints) {
             this.endPoints = {
                 [this.keyPoint(this.end)]: [this.end],
@@ -23,7 +23,7 @@ class Los {
             return;
         }
         this.endPoints = this.getPointsFromPosition(this.end).reduce((obj, point) => {
-            const key = this.keyPoint(point);
+            const key = Los.keyPoint(point);
             const newObj = {
                 ...obj,
                 [key]: [
@@ -34,15 +34,17 @@ class Los {
     
             return newObj;
         }, {});
+
+        //console.log(this.endPoints);
     }
 
     getPointsFromPosition(position) {
-        const key = this.keyPoint(position);
+        const key = Los.keyPoint(position);
         if (this.preComputedPoints[key]) {
             return this.preComputedPoints[key];
         }
         //console.log('begin get points', position);
-        let { points, lines } = getAllPoints();
+        let { points, lines } = this.getAllPoints();
     
         // filter out points we can't see
         points = points.filter((point) => {
@@ -217,5 +219,9 @@ class Los {
         };
 
         return allPoints;
+    }
+
+    getEndPoints() {
+        return this.endPoints;
     }
 }

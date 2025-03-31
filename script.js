@@ -267,7 +267,7 @@ function addToQueue(position, path) {
         }
     }
 
-    const key = los.keyPoint(position);
+    const key = Los.keyPoint(position);
 
     const cost = Math.sqrt(Math.pow(position[0] - end[0], 2) + Math.pow(position[1] - end[1], 2));
     let pathCost = 0;
@@ -328,7 +328,7 @@ function addToQueue(position, path) {
     if (!inserted) {
         queue.push(newQueueObj);
     }
-    processed[keyPoint(position)] = true;
+    processed[Los.keyPoint(position)] = true;
 }
 
 function processQueue() {
@@ -354,12 +354,12 @@ function processQueue() {
     points = pointsForPosition;
     path = queueItem.path;
 
-   // console.log('procesing queue got points', points.length);
+    //console.log('procesing queue got points', points.length);
     for (const point of points) {
         // is this point a point that can see the end?
-        const key = los.keyPoint(point);
-        if (endPoints[key]) {
-            addValidPath([...path, position, ...endPoints[key]]);
+        const key = Los.keyPoint(point);
+        if (los.getEndPoints()[key]) {
+            addValidPath([...path, position, ...los.getEndPoints()[key]]);
             continue;
         }
 
@@ -444,7 +444,7 @@ function draw() {
         ctx.stroke();
     }*/
 
-    for (const point of getAllPoints().points) {
+    for (const point of los.getAllPoints().points) {
         ctx.fillStyle = "purple";
         ctx.beginPath();
         ctx.arc(point[0], point[1], 2, 0, 2*Math.PI);
@@ -507,7 +507,7 @@ function start() {
     los = new Los(width, height, start, end, walls, overridePoints);
 
     addToQueue(startPoint, [], []);
-    preCompute();
+    los.preCompute();
     update();
 }
 
