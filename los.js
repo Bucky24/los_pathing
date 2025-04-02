@@ -9,10 +9,27 @@ class Los {
         this.endPoints = {};
         this.preComputedPoints = {};
         this.allPoints = null;
+        this.validPath = null;
+        this.queue = [];
+        this.processed = {};
     }
 
     static keyPoint(point) {
         return `${point[0]},${point[1]}`;
+    }
+
+    static getPathCost(path) {
+        let cost = 0;
+        let last = null;
+        for (let item of path) {
+            if (last) {
+                const dist = Math.sqrt(Math.pow(last[0] - item[0],2) + Math.pow(last[1]-item[1] ,2));
+                cost += dist;
+            }
+            last = item;
+        }
+    
+        return cost;
     }
 
     preCompute() {
@@ -67,7 +84,7 @@ class Los {
     
         //console.log('after filter', points.length);
     
-        preComputedPoints[key] = points;
+        this.preComputedPoints[key] = points;
     
         return points;
     }
@@ -223,5 +240,94 @@ class Los {
 
     getEndPoints() {
         return this.endPoints;
+    }
+
+    setValidPath(path) {
+        const cost = Los.getPathCost(path);
+        if (!this.validPath || cost < Los.getPathCost(this.validPath)) {
+            this.validPath = path;
+        } else {
+            //console.log("Rejecting path", path, "cost too much");
+        }
+    }
+
+    getValidPath() {
+        return this.validPath;
+    }
+
+    addToQueue(position, path) {
+        // don't allow loops in the path
+        for (const item of path) {
+            if (item[0] === position[0] && item[1] === position[1]) {
+                return;
+            }
+        }
+    
+        const key = Los.keyPoint(position);
+    
+        const cost = Math.sqrt(Math.pow(position[0] - end[0], 2) + Math.pow(position[1] - end[1], 2));
+        let pathCost = 0;
+        let previous = null;
+        for (const point of path) {
+            if (previous) {
+                pathCost += Math.sqrt(Math.pow(point[0] - previous[0], 2) + Math.pow(point[1] - previous[1], 2));
+            }
+            previous = point;
+        }
+        if (previous) {
+            pathCost += Math.sqrt(Math.pow(previous[0] - position[0], 2) + Math.pow(previous[1] - position[1], 2));
+        }
+    
+        const newQueueObj = {
+            position,
+            path,
+            cost,
+            pathCost,
+        };
+    
+        // is this item already in the queue? If so, only add it again if our current path
+        // is shorter than the one already in queue
+        if (this.processed[key] !== undefined && this.processed[key] !== null) {
+            // find our path in the queue
+            const index = this.queue.findIndex((a) => {
+                return a.position[0] === position[0] && a.position[1] === position[1];
+            });
+            // if the item has already been processed, then it was probably cheaper
+            // than our path and we can just skip. Otherwise, we can compare
+            if (index >= 0) {
+                const cost = Los.getPathCost(path);
+                const otherCost = Los.getPathCost(this.queue[index].path);
+    
+                if (cost < otherCost) {
+                    this.queue[index] = newQueueObj;
+                }
+            }
+            return;
+        }
+    
+        //console.log(path);
+    
+        //const cost = getPathCost([...path, position]);
+        // distance to the end
+    
+        //console.log('hanlding', position);
+    
+        let inserted = false;
+        for (let i=0;i<this.queue.length;i++) {
+            if (this.queue[i].pathCost >= pathCost) {
+                this.queue.splice(i, 0, newQueueObj);
+                inserted = true;
+                break;
+            }
+        }
+    
+        if (!inserted) {
+            this.queue.push(newQueueObj);
+        }
+        this.processed[Los.keyPoint(position)] = true;
+    }
+
+    getQueue() {
+        return this.queue;
     }
 }
