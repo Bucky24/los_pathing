@@ -1,17 +1,22 @@
 class Los {
-    constructor(width, height, start, end, walls, overridePoints = null) {
+    constructor(width, height, start, end, walls, settings = null) {
         this.width = width;
         this.height = height;
         this.start = start;
         this.end = end;
         this.walls = walls;
-        this.overridePoints = overridePoints;
         this.endPoints = {};
         this.preComputedPoints = {};
         this.allPoints = null;
         this.validPath = null;
         this.queue = [];
         this.processed = {};
+        this.position = [];
+
+        if (settings) {
+            this.overridePoints = settings.overridePoints;
+            this.maxDistToLine = settings.maxDistToLine;
+        }
     }
 
     static keyPoint(point) {
@@ -221,7 +226,7 @@ class Los {
         filteredPoints = filteredPoints.filter((point) => {
             for (const line of lines) {
                 const dist = distanceFromLine([ {x: line[0], y: line[1]}, {x: line[2], y: line[3]}], {x: point[0], y: point[1] });
-                if (dist < maxDistToLine) {
+                if (dist < this.maxDistToLine) {
                     return false;
                 }
             }
@@ -329,5 +334,46 @@ class Los {
 
     getQueue() {
         return this.queue;
+    }
+
+    processQueue() {
+        if (this.queue.length === 0) {
+            return;
+        }
+    
+        const queueItem = this.queue.shift();
+    
+        let pointsForPosition = this.getPointsFromPosition(queueItem.position);
+            pointsForPosition = pointsForPosition.filter((point) => {
+            for (const item of queueItem.path) {
+                if (item[0] === point[0] && item[1] === point[1]) {
+                    //console.log('matcing');
+                    return false;
+                }
+            }
+    
+            return true;
+        });
+    
+        this.position = queueItem.position;
+        path = queueItem.path;
+    
+        //console.log('procesing queue got points', points.length);
+        for (const point of pointsForPosition) {
+            // is this point a point that can see the end?
+            const key = Los.keyPoint(point);
+            if (this.endPoints[key]) {
+                this.setValidPath([...path, queueItem.position, ...this.endPoints[key]]);
+                continue;
+            }
+    
+            //console.log('checking', point);
+            this.addToQueue(point, [...path, queueItem.position]);
+        }
+        //console.log('when done', queue.length, processed.length);
+    }
+
+    getCurrentPosition() {
+        return this.position;
     }
 }

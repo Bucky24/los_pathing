@@ -21,7 +21,7 @@ runButton.addEventListener('click', async () => {
     let count = 0;
     while (los.getQueue().length > 0) {
         console.log(los.getQueue().length, count);
-        processQueue();
+        los.processQueue();
         count ++;
         if (count > 2000) {
             break;
@@ -46,14 +46,12 @@ const width = 500;
 const height = 500;
 
 const startPoint = [40, 200];
-let position = [];
 const end = [400, 50];
 const walls = [
     [60, 0, 80, 300],
     [200,200, 300, 220],
     [89, 274, 176, 331],
 ];
-let path = [];
 const maxDistToLine = 5;
 let los;
 
@@ -65,43 +63,6 @@ const overridePoints = null;
     [126, 130],
     [...end],
 ];*/
-
-function processQueue() {
-    if (los.getQueue().length === 0) {
-        return;
-    }
-
-    const queueItem = los.getQueue().shift();
-
-    let pointsForPosition = los.getPointsFromPosition(queueItem.position);
-        pointsForPosition = pointsForPosition.filter((point) => {
-        for (const item of queueItem.path) {
-            if (item[0] === point[0] && item[1] === point[1]) {
-                //console.log('matcing');
-                return false;
-            }
-        }
-
-        return true;
-    });
-
-    position = queueItem.position;
-    path = queueItem.path;
-
-    //console.log('procesing queue got points', points.length);
-    for (const point of pointsForPosition) {
-        // is this point a point that can see the end?
-        const key = Los.keyPoint(point);
-        if (los.getEndPoints()[key]) {
-            los.setValidPath([...path, position, ...los.getEndPoints()[key]]);
-            continue;
-        }
-
-        //console.log('checking', point);
-        los.addToQueue(point, [...path, position]);
-    }
-    //console.log('when done', queue.length, processed.length);
-}
 
 function renderPathList() {
     pathList.innerHTML = "";
@@ -117,7 +78,7 @@ function renderPathList() {
 }
 
 function update() {
-    processQueue();
+    los.processQueue();
 
     renderPathList();
 
@@ -130,9 +91,9 @@ function draw() {
 
     ctx.clearRect(0, 0, width, height);
 
-    ctx.fillStyle = "red";
+    ctx.fillStyle = "#f00";
     ctx.beginPath();
-    ctx.arc(start[0], start[1], 10, 0, 2*Math.PI);
+    ctx.arc(startPoint[0], startPoint[1], 10, 0, 2*Math.PI);
     ctx.fill();
 
     ctx.fillStyle = "green";
@@ -142,26 +103,13 @@ function draw() {
 
     ctx.fillStyle = "yellow";
     ctx.beginPath();
-    ctx.arc(position[0], position[1], 10, 0, 2*Math.PI);
+    ctx.arc(los.getCurrentPosition()[0], los.getCurrentPosition()[1], 10, 0, 2*Math.PI);
     ctx.fill();
 
     for (const wall of walls) {
         ctx.fillStyle = "rgba(128, 0, 128, 0.5)";
         ctx.fillRect(wall[0], wall[1], Math.abs(wall[0]-wall[2]), Math.abs(wall[1]-wall[3]));
     }
-
-    /*for (const point of points) {
-        ctx.fillStyle = "black";
-        ctx.beginPath();
-        ctx.arc(point[0], point[1], 5, 0, 2*Math.PI);
-        ctx.fill();
-
-        ctx.strokeStyle = "black";
-        ctx.beginPath();
-        ctx.moveTo(position[0], position[1]);
-        ctx.lineTo(point[0], point[1]);
-        ctx.stroke();
-    }*/
 
     for (const point of los.getAllPoints().points) {
         ctx.fillStyle = "purple";
@@ -187,7 +135,7 @@ function draw() {
             ctx.strokeStyle = "green";
             ctx.beginPath();
             ctx.moveTo(last[0], last[1]);
-            ctx.lineTo(position[0], position[1]);
+            ctx.lineTo(los.getCurrentPosition()[0], los.getCurrentPosition()[1]);
             ctx.stroke();
         }
     }
@@ -213,10 +161,12 @@ function draw() {
 }
 
 function start() {
-    position = [...startPoint];
     path = [];
     allPoints = null;
-    los = new Los(width, height, start, end, walls, overridePoints);
+    los = new Los(width, height, start, end, walls, {
+        overridePoints,
+        maxDistToLine,
+    });
 
     los.addToQueue(startPoint, [], []);
     los.preCompute();
