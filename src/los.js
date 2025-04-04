@@ -109,17 +109,26 @@ export default class Los {
         for (let i=0;i<this.walls.length;i++) {
             const wall = this.walls[i];
 
-            const cx = (Math.abs(wall[0] - wall[2]) / 2) + Math.min(wall[0], wall[2]);
-            const cy = (Math.abs(wall[1] - wall[3]) / 2) + Math.min(wall[1], wall[3]);
+            const allX = wall.map((point) => point.x);
+            const allY = wall.map((point) => point.y);
+
+            const cx = Math.round(allX.reduce((sum, x) => sum + x, 0) / allX.length);
+            const cy = Math.round(allY.reduce((sum, y) => sum + y, 0) / allY.length);
 
             const key = `wall_${i}`;
 
-            const addablePoints = [
-                [wall[0], wall[1]],
-                [wall[2], wall[1]],
-                [wall[0], wall[3]],
-                [wall[2], wall[3]]
-            ];
+            const addablePoints = [];
+            let prev = null;
+            for (const point of wall) {
+                addablePoints.push([point.x, point.y]);
+                if (prev) {
+                    lines.push([prev.x, prev.y, point.x, point.y, key]);
+                }
+                prev = point;
+            }
+            if (prev && wall.length > 2) {
+                lines.push([prev.x, prev.y, wall[0].x, wall[0].y, key]);
+            }
 
             for (const point of addablePoints) {
                 // move a bit away from the center
@@ -148,11 +157,6 @@ export default class Los {
                     key,
                 ]);*/
             }
-
-            lines.push([wall[0], wall[1], wall[2], wall[1]]);
-            lines.push([wall[2], wall[1], wall[2], wall[3]]);
-            lines.push([wall[2], wall[3], wall[0], wall[3]]);
-            lines.push([wall[0], wall[3], wall[0], wall[1]]);
         }
 
         // add points involving the outer edge of the map
@@ -227,6 +231,11 @@ export default class Los {
         // filter out points that are too close to lines
         filteredPoints = filteredPoints.filter((point) => {
             for (const line of lines) {
+                //console.log(point, line);
+                if (line[4] === point[2]) {
+                    // don't filter point if it came from this shape
+                    continue;
+                }
                 const dist = Line.distanceFromLine([ {x: line[0], y: line[1]}, {x: line[2], y: line[3]}], {x: point[0], y: point[1] });
                 if (dist < this.maxDistToLine) {
                     return false;

@@ -50,9 +50,10 @@ const height = 500;
 const startPoint = [40, 200];
 const end = [400, 50];
 const walls = [
-    [60, 0, 80, 300],
-    [200,200, 300, 220],
-    [89, 274, 176, 331],
+    [{x: 60, y: 0}, { x: 80, y: 0}, {x: 80, y: 300}, {x:60, y:300}],
+    [{x: 200, y: 200}, { x: 300, y: 200 }, { x: 300, y: 220 }, { x: 200, y: 220 }],
+    [{x: 89, y: 274}, {x: 176, y: 274}, {x: 176, y: 331} ,{x: 89, y: 331}],
+    [{x: 131, y: 188 }, { x: 182, y: 235 }],
 ];
 const maxDistToLine = 5;
 let los;
@@ -110,7 +111,14 @@ function draw() {
 
     for (const wall of walls) {
         ctx.fillStyle = "rgba(128, 0, 128, 0.5)";
-        ctx.fillRect(wall[0], wall[1], Math.abs(wall[0]-wall[2]), Math.abs(wall[1]-wall[3]));
+        ctx.beginPath();
+        ctx.moveTo(wall[0].x, wall[0].y);
+        for (let i=1;i<wall.length;i++) {
+            ctx.lineTo(wall[i].x, wall[i].y);
+        }
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
     }
 
     for (const point of los.getAllPoints().points) {
