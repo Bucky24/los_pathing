@@ -1,3 +1,5 @@
+import Los from "@bucky24/los";
+
 const canvas = document.getElementById("canvas");
 const button = document.getElementById("step");
 const pathList = document.getElementById("path_list");
@@ -119,9 +121,9 @@ function draw() {
     }
 
     //console.log(path);
-    if (path.length > 0) {
+    if (los.getPath().length > 0) {
         let last = null;
-        for (const point of path) {
+        for (const point of los.getPath()) {
             if (last) {
                 ctx.strokeStyle = "green";
                 ctx.beginPath();
@@ -161,8 +163,6 @@ function draw() {
 }
 
 function start() {
-    path = [];
-    allPoints = null;
     los = new Los(width, height, start, end, walls, {
         overridePoints,
         maxDistToLine,

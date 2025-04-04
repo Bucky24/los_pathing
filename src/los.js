@@ -1,4 +1,6 @@
-class Los {
+import { Line } from '@bucky24/toolbox';
+
+export default class Los {
     constructor(width, height, start, end, walls, settings = null) {
         this.width = width;
         this.height = height;
@@ -50,7 +52,7 @@ class Los {
                 ...obj,
                 [key]: [
                     point,
-                    end,
+                    this.end,
                 ],
             };
     
@@ -75,9 +77,9 @@ class Los {
                 return false;
             }
             for (const line of lines) {
-                const intersect = doLinesIntersect(
-                    [position[0], position[1]], [point[0], point[1]],
-                    [line[0], line[1]], [line[2], line[3]],
+                const intersect = Line.doLinesIntersect(
+                    [{ x: position[0], y: position[1] }, { x: point[0], y: point[1] }],
+                    [{ x:line[0], y: line[1] }, { x: line[2], y: line[3] }],
                 );
                 if (intersect) {
                     return false;
@@ -156,12 +158,12 @@ class Los {
         // add points involving the outer edge of the map
         for (let i=0;i<=this.width;i+=Math.floor(this.width / 4)) {
             points.push([i, 0, 'outer']);
-            points.push([i, height, 'outer']);
+            points.push([i, this.height, 'outer']);
         }
 
         for (let i=0;i<=this.height;i+=Math.floor(this.height / 4)) {
             points.push([0, i, 'outer']);
-            points.push([width, i, 'outer']);
+            points.push([this.width, i, 'outer']);
         }
 
         // now calculate halfway points between everything
@@ -191,7 +193,7 @@ class Los {
         // remove dupes
         const seen = new Set();
         points = points.filter((point) => {
-            if (point[0] < 0 || point[1] < 0 || point[0] > width || point[1] > height) {
+            if (point[0] < 0 || point[1] < 0 || point[0] > this.width || point[1] > this.height) {
                 return false;
             }
 
@@ -225,7 +227,7 @@ class Los {
         // filter out points that are too close to lines
         filteredPoints = filteredPoints.filter((point) => {
             for (const line of lines) {
-                const dist = distanceFromLine([ {x: line[0], y: line[1]}, {x: line[2], y: line[3]}], {x: point[0], y: point[1] });
+                const dist = Line.distanceFromLine([ {x: line[0], y: line[1]}, {x: line[2], y: line[3]}], {x: point[0], y: point[1] });
                 if (dist < this.maxDistToLine) {
                     return false;
                 }
@@ -235,8 +237,8 @@ class Los {
         })
         //console.error('loop done', points.length);
 
-        allPoints = {
-            points: overridePoints || filteredPoints,
+        const allPoints = {
+            points: this.overridePoints || filteredPoints,
             lines,
         };
 
@@ -270,7 +272,7 @@ class Los {
     
         const key = Los.keyPoint(position);
     
-        const cost = Math.sqrt(Math.pow(position[0] - end[0], 2) + Math.pow(position[1] - end[1], 2));
+        const cost = Math.sqrt(Math.pow(position[0] - this.end[0], 2) + Math.pow(position[1] - this.end[1], 2));
         let pathCost = 0;
         let previous = null;
         for (const point of path) {
@@ -356,24 +358,28 @@ class Los {
         });
     
         this.position = queueItem.position;
-        path = queueItem.path;
+        this.path = queueItem.path;
     
         //console.log('procesing queue got points', points.length);
         for (const point of pointsForPosition) {
             // is this point a point that can see the end?
             const key = Los.keyPoint(point);
             if (this.endPoints[key]) {
-                this.setValidPath([...path, queueItem.position, ...this.endPoints[key]]);
+                this.setValidPath([...queueItem.path, queueItem.position, ...this.endPoints[key]]);
                 continue;
             }
     
             //console.log('checking', point);
-            this.addToQueue(point, [...path, queueItem.position]);
+            this.addToQueue(point, [...queueItem.path, queueItem.position]);
         }
         //console.log('when done', queue.length, processed.length);
     }
 
     getCurrentPosition() {
         return this.position;
+    }
+
+    getPath() {
+        return this.path;
     }
 }
